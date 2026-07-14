@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import ai.opencode.android.R
 import ai.opencode.android.ui.theme.TuiColors
 import ai.opencode.android.ui.theme.TuiFont
@@ -52,7 +54,9 @@ fun HomeScreen(
     onSessions: () -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: HomeViewModel = hiltViewModel(),
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     val alpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
@@ -103,6 +107,42 @@ fun HomeScreen(
                 modifier = Modifier.alpha(alpha.value),
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Status indicator
+            val statusColor = when {
+                uiState.isConnected -> TuiColors.TerminalGreen
+                uiState.error != null -> Color(0xFFFF6B6B)
+                uiState.isChecking -> TuiColors.OnSurfaceVariant
+                else -> TuiColors.OnSurfaceVariant
+            }
+            val statusText = when {
+                uiState.isConnected -> "● connected"
+                uiState.error != null -> "○ error"
+                uiState.isChecking -> "○ connecting..."
+                else -> "○ ready"
+            }
+
+            Text(
+                text = statusText,
+                color = statusColor,
+                fontSize = 10.sp,
+                fontFamily = TuiFont.Mono,
+                modifier = Modifier.alpha(alpha.value),
+            )
+
+            if (uiState.error != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = uiState.error ?: "",
+                    color = TuiColors.OnSurfaceVariant,
+                    fontSize = 9.sp,
+                    fontFamily = TuiFont.Mono,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.alpha(alpha.value),
+                )
+            }
+
             Spacer(modifier = Modifier.height(48.dp))
 
             // Menu items
@@ -138,7 +178,7 @@ fun HomeScreen(
 
             // Version
             Text(
-                text = "v1.0.0",
+                text = "v1.0.0 (embedded)",
                 color = TuiColors.OnSurfaceVariant.copy(alpha = 0.5f),
                 fontSize = 10.sp,
                 fontFamily = TuiFont.Mono,

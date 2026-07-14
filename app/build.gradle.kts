@@ -82,13 +82,22 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.runtime.ktx)
 
-    // Ktor
+    // Ktor Client
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.json)
     implementation(libs.ktor.client.websockets)
     implementation(libs.ktor.client.logging)
+
+    // Ktor Server (embedded)
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.server.cors)
+
+    // SQLite
+    implementation(libs.androidx.sqlite.ktx)
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)

@@ -16,7 +16,9 @@ import javax.inject.Inject
 data class HomeUiState(
     val hasApiKey: Boolean = false,
     val hasServerUrl: Boolean = false,
+    val isConnected: Boolean = false,
     val isChecking: Boolean = true,
+    val error: String? = null,
 )
 
 @HiltViewModel
@@ -30,6 +32,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         checkState()
+        connectToEmbeddedServer()
     }
 
     private fun checkState() {
@@ -40,6 +43,31 @@ class HomeViewModel @Inject constructor(
                     hasServerUrl = !serverUrl.isNullOrBlank(),
                     isChecking = false,
                 )
+            }
+        }
+    }
+
+    private fun connectToEmbeddedServer() {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isChecking = true) }
+                client.connect("http://127.0.0.1:4096")
+                _uiState.update {
+                    it.copy(
+                        isConnected = true,
+                        hasServerUrl = true,
+                        isChecking = false,
+                        error = null,
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isConnected = false,
+                        isChecking = false,
+                        error = "Failed to connect: ${e.message}",
+                    )
+                }
             }
         }
     }
