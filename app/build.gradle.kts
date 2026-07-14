@@ -102,6 +102,10 @@ dependencies {
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.server.cors)
+    implementation(libs.ktor.server.sse)
+
+    // OkHttp SSE (streaming)
+    implementation(libs.okhttp.sse)
 
     // SQLite
     implementation(libs.androidx.sqlite.ktx)

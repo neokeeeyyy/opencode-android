@@ -1,8 +1,6 @@
 package ai.opencode.android.di
 
-import ai.opencode.android.data.api.OpenCodeApi
 import ai.opencode.android.data.api.OpenCodeClient
-import ai.opencode.android.data.api.SseClient
 import ai.opencode.android.data.store.SettingsStore
 import ai.opencode.android.server.LocalServer
 import ai.opencode.android.server.LlmClient
@@ -34,22 +32,6 @@ object AppModule {
         settingsStore: SettingsStore,
     ): OpenCodeClient {
         return OpenCodeClient(settingsStore)
-    }
-
-    @Provides
-    @Singleton
-    fun provideOpenCodeApi(
-        client: OpenCodeClient,
-    ): OpenCodeApi {
-        return OpenCodeApi(client)
-    }
-
-    @Provides
-    @Singleton
-    fun provideSseClient(
-        client: OpenCodeClient,
-    ): SseClient {
-        return SseClient(client)
     }
 
     @Provides

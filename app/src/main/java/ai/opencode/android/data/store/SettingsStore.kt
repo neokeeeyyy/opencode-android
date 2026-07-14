@@ -55,6 +55,10 @@ class SettingsStore @Inject constructor(
         return context.dataStore.data.map { it[stringPreferencesKey("api_key_$provider")] }.first()
     }
 
+    suspend fun getCurrentModel(): String? {
+        return context.dataStore.data.map { it[CURRENT_MODEL] }.first()
+    }
+
     suspend fun clear() {
         context.dataStore.edit { it.clear() }
     }

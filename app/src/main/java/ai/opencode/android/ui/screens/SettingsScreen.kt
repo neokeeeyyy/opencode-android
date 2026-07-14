@@ -1,6 +1,7 @@
 package ai.opencode.android.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
@@ -96,15 +98,76 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 InfoCard(
                     label = "server",
-                    value = uiState.serverUrl ?: "not connected",
+                    value = uiState.serverUrl ?: "embedded (localhost:4096)",
                     isConnected = uiState.isConnected,
                 )
             }
 
-            // API Keys
+            // Free Models Section
             item {
-                SectionHeader(title = "api keys")
+                SectionHeader(title = "free models (no API key needed)")
                 Spacer(modifier = Modifier.height(4.dp))
+                FreeModelCard(
+                    name = "Big Pickle",
+                    provider = "Groq",
+                    description = "Llama 3.3 70B - modelo del equipo",
+                    isSelected = uiState.selectedModel == "opencode/big-pickle",
+                    onClick = { viewModel.selectModel("opencode/big-pickle") }
+                )
+            }
+
+            item {
+                FreeModelCard(
+                    name = "Llama 3.3 70B",
+                    provider = "Groq",
+                    description = "Modelo principal gratuito",
+                    isSelected = uiState.selectedModel == "groq/llama-3.3-70b-versatile",
+                    onClick = { viewModel.selectModel("groq/llama-3.3-70b-versatile") }
+                )
+            }
+
+            item {
+                FreeModelCard(
+                    name = "Gemini 2.5 Flash",
+                    provider = "Google",
+                    description = "Modelo rápido de Google",
+                    isSelected = uiState.selectedModel == "gemini/gemini-2.5-flash",
+                    onClick = { viewModel.selectModel("gemini/gemini-2.5-flash") }
+                )
+            }
+
+            item {
+                FreeModelCard(
+                    name = "DeepSeek R1 (temp)",
+                    provider = "OpenCode",
+                    description = "Modelo temporal semanal",
+                    isSelected = uiState.selectedModel == "opencode/temp/deepseek-r1",
+                    onClick = { viewModel.selectModel("opencode/temp/deepseek-r1") }
+                )
+            }
+
+            // Paid API Keys
+            item {
+                SectionHeader(title = "paid api keys (optional)")
+                Spacer(modifier = Modifier.height(4.dp))
+                ApiKeyField(
+                    label = "groq",
+                    key = uiState.groqKey,
+                    onKeyChange = { viewModel.updateGroqKey(it) },
+                    isConfigured = uiState.groqKey.isNotBlank(),
+                )
+            }
+
+            item {
+                ApiKeyField(
+                    label = "gemini",
+                    key = uiState.geminiKey,
+                    onKeyChange = { viewModel.updateGeminiKey(it) },
+                    isConfigured = uiState.geminiKey.isNotBlank(),
+                )
+            }
+
+            item {
                 ApiKeyField(
                     label = "openai",
                     key = uiState.openaiKey,
@@ -129,34 +192,6 @@ fun SettingsScreen(
                     onKeyChange = { viewModel.updateOpenrouterKey(it) },
                     isConfigured = uiState.openrouterKey.isNotBlank(),
                 )
-            }
-
-            // Providers
-            if (uiState.providers.isNotEmpty()) {
-                item {
-                    SectionHeader(title = "providers")
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-                items(uiState.providers) { provider ->
-                    ProviderCard(
-                        name = provider.name,
-                        modelCount = provider.models.size,
-                    )
-                }
-            }
-
-            // Config
-            uiState.config?.let { config ->
-                item {
-                    SectionHeader(title = "model")
-                    Spacer(modifier = Modifier.height(4.dp))
-                    config.model?.let { models ->
-                        models.entries.forEach { (key, value) ->
-                            InfoCard(label = key, value = value)
-                            Spacer(modifier = Modifier.height(4.dp))
-                        }
-                    }
-                }
             }
 
             uiState.error?.let { error ->
@@ -224,6 +259,72 @@ private fun InfoCard(
                     color = if (isConnected) TuiColors.TerminalGreen else TuiColors.OnBackground,
                     fontSize = 11.sp,
                     fontFamily = TuiFont.Mono,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FreeModelCard(
+    name: String,
+    provider: String,
+    description: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) TuiColors.TerminalGreen.copy(alpha = 0.1f) else TuiColors.Surface
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) TuiColors.TerminalGreen else TuiColors.CodeBorder
+        ),
+        shape = RoundedCornerShape(2.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = name,
+                        color = TuiColors.OnBackground,
+                        fontSize = 12.sp,
+                        fontFamily = TuiFont.Mono,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (isSelected) {
+                        Spacer(modifier = Modifier.size(4.dp))
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Selected",
+                            tint = TuiColors.TerminalGreen,
+                            modifier = Modifier.size(10.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = "$provider - $description",
+                    color = TuiColors.OnSurfaceVariant,
+                    fontSize = 10.sp,
+                    fontFamily = TuiFont.Mono,
+                )
+            }
+            if (isSelected) {
+                Icon(
+                    Icons.Default.Star,
+                    contentDescription = "Active",
+                    tint = TuiColors.TerminalGreen,
+                    modifier = Modifier.size(14.dp),
                 )
             }
         }

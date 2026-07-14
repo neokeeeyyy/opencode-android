@@ -10,6 +10,7 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.request.*
 import io.ktor.http.*
+import io.ktor.server.sse.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,6 +24,7 @@ object LocalServer {
     private val serverScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private lateinit var llmClient: LlmClient
+    private val toolExecutor = ToolExecutor()
 
     fun setLlmClient(client: LlmClient) {
         llmClient = client
@@ -47,11 +49,36 @@ object LocalServer {
                 allowHeader(HttpHeaders.ContentType)
             }
 
+            install(SSE)
+
             routing {
+                // Health
                 get("/global/health") {
-                    call.respond(mapOf("status" to "ok"))
+                    call.respond(mapOf("status" to "ok", "version" to "1.0.0-embedded"))
                 }
 
+                // Models
+                get("/models") {
+                    val models = llmClient.getAllModels().map { (id, info) ->
+                        mapOf(
+                            "id" to id,
+                            "name" to info.displayName,
+                            "provider" to info.provider,
+                            "free" to info.free.toString(),
+                            "temporary" to info.temporary.toString()
+                        )
+                    }
+                    call.respond(models)
+                }
+
+                get("/models/free") {
+                    val models = llmClient.getFreeModels().map { (id, info) ->
+                        mapOf("id" to id, "name" to info.displayName, "provider" to info.provider)
+                    }
+                    call.respond(models)
+                }
+
+                // Sessions
                 get("/session") {
                     val sessions = SessionManager.getAllSessions()
                     call.respond(sessions)
@@ -64,39 +91,32 @@ object LocalServer {
 
                 get("/session/{id}") {
                     val id = call.parameters["id"] ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Missing session ID")
+                        HttpStatusCode.BadRequest, mapOf("error" to "Missing session ID")
                     )
                     val session = SessionManager.getSession(id)
-                    if (session != null) {
-                        call.respond(session)
-                    } else {
-                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "Session not found"))
-                    }
+                    if (session != null) call.respond(session)
+                    else call.respond(HttpStatusCode.NotFound, mapOf("error" to "Session not found"))
                 }
 
                 delete("/session/{id}") {
                     val id = call.parameters["id"] ?: return@delete call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Missing session ID")
+                        HttpStatusCode.BadRequest, mapOf("error" to "Missing session ID")
                     )
                     SessionManager.deleteSession(id)
                     call.respond(mapOf("status" to "deleted"))
                 }
 
+                // Messages
                 get("/session/{id}/message") {
                     val sessionId = call.parameters["id"] ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Missing session ID")
+                        HttpStatusCode.BadRequest, mapOf("error" to "Missing session ID")
                     )
-                    val messages = MessageStore.getMessages(sessionId)
-                    call.respond(messages)
+                    call.respond(MessageStore.getMessages(sessionId))
                 }
 
                 post("/session/{id}/message") {
                     val sessionId = call.parameters["id"] ?: return@post call.respond(
-                        HttpStatusCode.BadRequest,
-                        mapOf("error" to "Missing session ID")
+                        HttpStatusCode.BadRequest, mapOf("error" to "Missing session ID")
                     )
                     val request = call.receive<MessageRequest>()
 
@@ -111,10 +131,12 @@ object LocalServer {
 
                     serverScope.launch {
                         try {
-                            val messages = MessageStore.getMessages(sessionId).map {
-                                LlmMessage(role = it.role, content = it.content)
-                            }
-                            val response = llmClient.chat(messages, request.model ?: "claude-sonnet-4-20250514")
+                            val response = llmClient.chat(
+                                messages = MessageStore.getMessages(sessionId).map {
+                                    LlmMessage(role = it.role, content = it.content)
+                                },
+                                model = request.model ?: "groq/llama-3.3-70b-versatile"
+                            )
 
                             val assistantMessage = Message(
                                 id = generateId(),
@@ -124,14 +146,93 @@ object LocalServer {
                                 timestamp = System.currentTimeMillis()
                             )
                             MessageStore.addMessage(assistantMessage)
-
                             _events.emit(Json.encodeToString(Message.serializer(), assistantMessage))
                         } catch (e: Exception) {
-                            _events.emit("""{"error":"${e.message?.replace("\"", "\\\"")}"}""")
+                            _events.emit("""{"type":"error","error":"${e.message?.replace("\"", "\\\"")}"}""")
                         }
                     }
 
                     call.respond(userMessage)
+                }
+
+                // Streaming chat (SSE)
+                sse("/session/{id}/stream") {
+                    val sessionId = call.parameters["id"] ?: return@sse
+                    var fullResponse = StringBuilder()
+
+                    val messages = MessageStore.getMessages(sessionId).map {
+                        LlmMessage(role = it.role, content = it.content)
+                    }
+                    val model = call.request.queryParameters["model"] ?: "groq/llama-3.3-70b-versatile"
+
+                    send(ServerSentEvent("connected"))
+
+                    llmClient.chatStream(messages, model) { event ->
+                        serverScope.launch {
+                            when (event.type) {
+                                "content" -> {
+                                    fullResponse.append(event.content)
+                                    send(ServerSentEvent(
+                                        data = Json.encodeToString(LlmStreamEvent.serializer(),
+                                            LlmStreamEvent(type = "content", content = event.content))
+                                    ))
+                                }
+                                "tool_call" -> {
+                                    send(ServerSentEvent(
+                                        data = Json.encodeToString(LlmStreamEvent.serializer(),
+                                            LlmStreamEvent(type = "tool_call", toolCall = event.toolCall))
+                                    ))
+                                }
+                                "done" -> {
+                                    if (fullResponse.isNotEmpty()) {
+                                        val assistantMessage = Message(
+                                            id = generateId(),
+                                            sessionId = sessionId,
+                                            role = "assistant",
+                                            content = fullResponse.toString(),
+                                            timestamp = System.currentTimeMillis()
+                                        )
+                                        MessageStore.addMessage(assistantMessage)
+                                    }
+                                    send(ServerSentEvent(
+                                        data = Json.encodeToString(LlmStreamEvent.serializer(),
+                                            LlmStreamEvent(type = "done", done = true))
+                                    ))
+                                }
+                                "error" -> {
+                                    send(ServerSentEvent(
+                                        data = Json.encodeToString(LlmStreamEvent.serializer(),
+                                            LlmStreamEvent(type = "error", content = event.content))
+                                    ))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Tool execution
+                post("/tool/execute") {
+                    val request = call.receive<ToolExecutionRequest>()
+                    val result = toolExecutor.execute(request.command, request.args)
+                    call.respond(result)
+                }
+
+                post("/tool/read") {
+                    val request = call.receive<ToolReadRequest>()
+                    val result = toolExecutor.readFile(request.path)
+                    call.respond(result)
+                }
+
+                post("/tool/write") {
+                    val request = call.receive<ToolWriteRequest>()
+                    val result = toolExecutor.writeFile(request.path, request.content)
+                    call.respond(result)
+                }
+
+                post("/tool/list") {
+                    val request = call.receive<ToolListRequest>()
+                    val result = toolExecutor.listFiles(request.path)
+                    call.respond(result)
                 }
             }
         }
@@ -154,4 +255,26 @@ object LocalServer {
 data class MessageRequest(
     val content: String,
     val model: String? = null
+)
+
+@kotlinx.serialization.Serializable
+data class ToolExecutionRequest(
+    val command: String,
+    val args: List<String> = emptyList()
+)
+
+@kotlinx.serialization.Serializable
+data class ToolReadRequest(
+    val path: String
+)
+
+@kotlinx.serialization.Serializable
+data class ToolWriteRequest(
+    val path: String,
+    val content: String
+)
+
+@kotlinx.serialization.Serializable
+data class ToolListRequest(
+    val path: String
 )

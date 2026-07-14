@@ -27,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ai.opencode.android.data.model.Session
+import ai.opencode.android.server.Session
 import ai.opencode.android.ui.theme.TuiColors
 import ai.opencode.android.ui.theme.TuiFont
 
@@ -77,7 +77,7 @@ fun SessionCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = session.title ?: session.id.take(8),
+                        text = session.title,
                         color = if (isSelected) TuiColors.TerminalGreen else TuiColors.OnBackground,
                         fontSize = 12.sp,
                         fontFamily = TuiFont.Mono,
@@ -85,14 +85,12 @@ fun SessionCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (session.agent != null) {
-                        Text(
-                            text = session.agent,
-                            color = TuiColors.OnSurfaceVariant,
-                            fontSize = 10.sp,
-                            fontFamily = TuiFont.Mono,
-                        )
-                    }
+                    Text(
+                        text = session.model.split("/").lastOrNull() ?: "model",
+                        color = TuiColors.OnSurfaceVariant,
+                        fontSize = 10.sp,
+                        fontFamily = TuiFont.Mono,
+                    )
                 }
             }
 

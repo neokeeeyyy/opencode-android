@@ -46,18 +46,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ai.opencode.android.data.api.ConnectionState
-import ai.opencode.android.data.model.AssistantMessage
-import ai.opencode.android.data.model.Message
-import ai.opencode.android.data.model.Part
-import ai.opencode.android.data.model.ToolState
-import ai.opencode.android.data.model.UserMessage
 import ai.opencode.android.ui.components.InputBar
 import ai.opencode.android.ui.components.MessageBubble
-import ai.opencode.android.ui.components.PermissionDialog
-import ai.opencode.android.ui.components.SessionCard
-import ai.opencode.android.ui.components.StatusBar
 import ai.opencode.android.ui.components.StreamingIndicator
-import ai.opencode.android.ui.components.ToolIndicator
 import ai.opencode.android.ui.theme.TuiColors
 import ai.opencode.android.ui.theme.TuiFont
 import kotlinx.coroutines.launch
@@ -196,7 +187,7 @@ fun ChatScreen(
                         }
 
                         Text(
-                            text = uiState.currentSession?.title ?: "opencode",
+                            text = "opencode",
                             color = TuiColors.OnBackground,
                             fontSize = 13.sp,
                             fontFamily = TuiFont.Mono,
@@ -204,9 +195,18 @@ fun ChatScreen(
                             modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                         )
 
+                        // Model indicator
+                        Text(
+                            text = uiState.currentModel.split("/").lastOrNull() ?: "model",
+                            color = TuiColors.TerminalGreen,
+                            fontSize = 10.sp,
+                            fontFamily = TuiFont.Mono,
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                        )
+
                         // Abort button when busy
-                        if (uiState.isBusy || uiState.isSending) {
-                            IconButton(onClick = { viewModel.abortSession() }) {
+                        if (uiState.isBusy) {
+                            IconButton(onClick = { viewModel.disconnect() }) {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Stop",
@@ -227,15 +227,6 @@ fun ChatScreen(
                     }
                 }
             },
-            bottomBar = {
-                StatusBar(
-                    connectionState = uiState.connectionState,
-                    currentModel = uiState.currentModel,
-                    currentAgent = uiState.currentAgent,
-                    sessionStatus = uiState.sessionStatus,
-                    currentSessionTitle = uiState.currentSession?.title,
-                )
-            },
             containerColor = TuiColors.Background,
         ) { padding ->
             Column(
@@ -244,27 +235,6 @@ fun ChatScreen(
                     .padding(padding),
             ) {
                 when {
-                    uiState.connectionState != ConnectionState.Connected -> {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = if (uiState.connectionState == ConnectionState.Connecting)
-                                        "connecting..."
-                                    else
-                                        "disconnected",
-                                    color = TuiColors.OnSurface,
-                                    fontSize = 13.sp,
-                                    fontFamily = TuiFont.Mono,
-                                )
-                            }
-                        }
-                    }
-
                     uiState.messages.isEmpty() && uiState.currentSessionId == null -> {
                         Box(
                             modifier = Modifier
@@ -300,7 +270,10 @@ fun ChatScreen(
                             verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             items(uiState.messages, key = { it.id }) { message ->
-                                MessageContent(message = message)
+                                MessageBubble(
+                                    role = message.role,
+                                    content = message.content,
+                                )
                             }
 
                             // Streaming text indicator
@@ -328,36 +301,12 @@ fun ChatScreen(
         }
     }
 
-    uiState.pendingPermissionId?.let {
-        PermissionDialog(
-            toolName = uiState.pendingPermissionTool ?: "unknown",
-            description = uiState.pendingPermissionDesc,
-            onApprove = { viewModel.approvePermission() },
-            onDeny = { viewModel.denyPermission() },
-        )
-    }
-}
-
-@Composable
-private fun MessageContent(message: Message) {
-    when (message) {
-        is UserMessage -> {
-            // User messages don't have parts in v1, show generic
-            MessageBubble(
-                role = "user",
-                content = "sent",
-            )
+    uiState.error?.let { error ->
+        // Show error as a snackbar or dialog
+        LaunchedEffect(error) {
+            // Auto-clear error after 5 seconds
+            kotlinx.coroutines.delay(5000)
+            viewModel.clearError()
         }
-        is AssistantMessage -> {
-            // Assistant messages have parts stored separately
-            // For now show a placeholder - parts come via message.part.updated events
-            if (message.error != null) {
-                MessageBubble(
-                    role = "assistant",
-                    content = "Error: ${message.error}",
-                )
-            }
-        }
-        else -> {}
     }
 }
