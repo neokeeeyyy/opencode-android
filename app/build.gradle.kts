@@ -89,6 +89,7 @@ dependencies {
     implementation(libs.ktor.serialization.json)
     implementation(libs.ktor.client.sse)
     implementation(libs.ktor.client.websockets)
+    implementation(libs.ktor.client.logging)
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
@@ -104,9 +105,6 @@ dependencies {
 
     // DataStore
     implementation(libs.datastore.preferences)
-
-    // Logging
-    implementation(libs.slf4j.android)
 }
 
 kapt {
