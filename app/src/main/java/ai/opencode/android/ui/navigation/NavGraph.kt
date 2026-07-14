@@ -8,9 +8,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import ai.opencode.android.ui.screens.ChatScreen
 import ai.opencode.android.ui.screens.ConnectScreen
+import ai.opencode.android.ui.screens.HomeScreen
 import ai.opencode.android.ui.screens.SettingsScreen
 
 object Routes {
+    const val HOME = "home"
     const val CONNECT = "connect"
     const val CHAT = "chat"
     const val SETTINGS = "settings"
@@ -23,9 +25,27 @@ fun OpenCodeNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Routes.CONNECT,
+        startDestination = Routes.HOME,
         modifier = modifier,
     ) {
+        composable(Routes.HOME) {
+            HomeScreen(
+                onNewChat = {
+                    navController.navigate(Routes.CONNECT) {
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
+                },
+                onSessions = {
+                    navController.navigate(Routes.CONNECT) {
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
+                },
+                onSettings = {
+                    navController.navigate(Routes.SETTINGS)
+                },
+            )
+        }
+
         composable(Routes.CONNECT) {
             ConnectScreen(
                 onConnected = {

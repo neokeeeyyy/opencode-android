@@ -46,6 +46,14 @@ class SettingsStore @Inject constructor(
         context.dataStore.edit { it[WORKING_DIRECTORY] = dir }
     }
 
+    suspend fun saveApiKey(provider: String, key: String) {
+        context.dataStore.edit { it[stringPreferencesKey("api_key_$provider")] = key }
+    }
+
+    suspend fun getApiKey(provider: String): String? {
+        return context.dataStore.data.map { it[stringPreferencesKey("api_key_$provider")] }.first()
+    }
+
     suspend fun clear() {
         context.dataStore.edit { it.clear() }
     }
