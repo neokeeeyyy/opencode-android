@@ -15,8 +15,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
-object EmbeddedServer {
-    private var server: NettyApplicationEngine? = null
+object LocalServer {
+    private var server: io.ktor.server.engine.EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
     private val _events = MutableSharedFlow<String>(extraBufferCapacity = 64)
     val events = _events.asSharedFlow()
     private const val PORT = 4096

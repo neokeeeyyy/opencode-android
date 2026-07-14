@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import ai.opencode.android.server.EmbeddedServer
+import ai.opencode.android.server.LocalServer
 import ai.opencode.android.ui.navigation.OpenCodeNavHost
 import ai.opencode.android.ui.theme.OpenCodeTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -16,13 +16,13 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject
-    lateinit var embeddedServer: EmbeddedServer
+    lateinit var localServer: LocalServer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        embeddedServer.start()
+        localServer.start()
 
         setContent {
             OpenCodeTheme {
@@ -33,6 +33,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        embeddedServer.stop()
+        localServer.stop()
     }
 }

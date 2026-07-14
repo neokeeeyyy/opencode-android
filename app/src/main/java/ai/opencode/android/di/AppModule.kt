@@ -4,7 +4,7 @@ import ai.opencode.android.data.api.OpenCodeApi
 import ai.opencode.android.data.api.OpenCodeClient
 import ai.opencode.android.data.api.SseClient
 import ai.opencode.android.data.store.SettingsStore
-import ai.opencode.android.server.EmbeddedServer
+import ai.opencode.android.server.LocalServer
 import ai.opencode.android.server.LlmClient
 import ai.opencode.android.server.SessionManager
 import ai.opencode.android.server.MessageStore
@@ -62,12 +62,12 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideEmbeddedServer(
+    fun provideLocalServer(
         llmClient: LlmClient,
-    ): EmbeddedServer {
+    ): LocalServer {
         SessionManager.init(llmClient.context)
         MessageStore.init(llmClient.context)
-        EmbeddedServer.setLlmClient(llmClient)
-        return EmbeddedServer
+        LocalServer.setLlmClient(llmClient)
+        return LocalServer
     }
 }
