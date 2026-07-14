@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 object EmbeddedServer {
-    private var server: ApplicationEngine? = null
+    private var server: NettyApplicationEngine? = null
     private val _events = MutableSharedFlow<String>(extraBufferCapacity = 64)
     val events = _events.asSharedFlow()
     private const val PORT = 4096
