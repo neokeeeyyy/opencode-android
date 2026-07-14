@@ -2,7 +2,7 @@ package ai.opencode.android.data.api
 
 import ai.opencode.android.data.model.Event
 import ai.opencode.android.data.model.SseEnvelope
-import io.ktor.client.plugins.sse.ClientSSESession
+import io.ktor.client.plugins.sse.SSESession
 import io.ktor.client.plugins.sse.sseSession
 import io.ktor.client.request.url
 import kotlinx.coroutines.CoroutineScope
@@ -10,7 +10,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -37,7 +36,7 @@ class SseClient @Inject constructor(
     val rawEvents: SharedFlow<SseEnvelope> = _rawEvents.asSharedFlow()
 
     private var job: Job? = null
-    private var session: ClientSSESession? = null
+    private var session: SSESession? = null
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -57,7 +56,7 @@ class SseClient @Inject constructor(
                         url("${client.serverUrl.value}/event")
                     }.use { sseSession ->
                         session = sseSession
-                        sseSession.incoming.receiveAsFlow().collect { sseEvent ->
+                        sseSession.incoming.collect { sseEvent ->
                             sseEvent.data?.let { data ->
                                 parseAndEmit(data)
                             }
@@ -76,18 +75,15 @@ class SseClient @Inject constructor(
 
     private suspend fun parseAndEmit(data: String) {
         try {
-            // Try to parse as envelope first: { directory, payload: { type, ... } }
             val element = json.parseToJsonElement(data)
             val obj = element.jsonObject
 
-            // Check if this is an envelope (has "payload" and "directory")
             val payload = obj["payload"]
             if (payload != null) {
                 val payloadObj = payload.jsonObject
                 val eventType = payloadObj["type"]?.jsonPrimitive?.content
 
                 if (eventType != null) {
-                    // Parse the payload as the specific event type
                     val event = parseEventByType(eventType, payloadObj)
                     if (event != null) {
                         _events.emit(event)
@@ -100,7 +96,6 @@ class SseClient @Inject constructor(
                     }
                 }
             } else {
-                // Maybe it's a direct event (no envelope)
                 val eventType = obj["type"]?.jsonPrimitive?.content
                 if (eventType != null) {
                     val event = parseEventByType(eventType, obj)
@@ -110,75 +105,62 @@ class SseClient @Inject constructor(
                 }
             }
         } catch (_: Exception) {
-            // Ignore unparseable events
         }
     }
 
     private fun parseEventByType(type: String, obj: JsonObject): Event? {
         return try {
             when (type) {
-                // Session lifecycle
-                "session.created" -> json.decodeFromToString<Event.SessionCreated>(obj.toString())
-                "session.updated" -> json.decodeFromToString<Event.SessionUpdated>(obj.toString())
-                "session.deleted" -> json.decodeFromToString<Event.SessionDeleted>(obj.toString())
-                "session.status" -> json.decodeFromToString<Event.SessionStatusEvent>(obj.toString())
-                "session.error" -> json.decodeFromToString<Event.SessionErrorEvent>(obj.toString())
-                "session.idle" -> json.decodeFromToString<Event.SessionIdle>(obj.toString())
-                "session.diff" -> json.decodeFromToString<Event.SessionDiff>(obj.toString())
-                "session.compacted" -> null // Not critical for UI
+                "session.created" -> json.decodeFromString<Event.SessionCreated>(obj.toString())
+                "session.updated" -> json.decodeFromString<Event.SessionUpdated>(obj.toString())
+                "session.deleted" -> json.decodeFromString<Event.SessionDeleted>(obj.toString())
+                "session.status" -> json.decodeFromString<Event.SessionStatusEvent>(obj.toString())
+                "session.error" -> json.decodeFromString<Event.SessionErrorEvent>(obj.toString())
+                "session.idle" -> json.decodeFromString<Event.SessionIdle>(obj.toString())
+                "session.diff" -> json.decodeFromString<Event.SessionDiff>(obj.toString())
+                "session.compacted" -> null
 
-                // Message lifecycle
-                "message.updated" -> json.decodeFromToString<Event.MessageUpdated>(obj.toString())
-                "message.removed" -> json.decodeFromToString<Event.MessageRemoved>(obj.toString())
-                "message.part.updated" -> json.decodeFromToString<Event.MessagePartUpdated>(obj.toString())
-                "message.part.delta" -> json.decodeFromToString<Event.MessagePartDelta>(obj.toString())
-                "message.part.removed" -> json.decodeFromToString<Event.MessagePartRemoved>(obj.toString())
+                "message.updated" -> json.decodeFromString<Event.MessageUpdated>(obj.toString())
+                "message.removed" -> json.decodeFromString<Event.MessageRemoved>(obj.toString())
+                "message.part.updated" -> json.decodeFromString<Event.MessagePartUpdated>(obj.toString())
+                "message.part.delta" -> json.decodeFromString<Event.MessagePartDelta>(obj.toString())
+                "message.part.removed" -> json.decodeFromString<Event.MessagePartRemoved>(obj.toString())
 
-                // Text streaming
-                "session.next.text.started" -> json.decodeFromToString<Event.TextStarted>(obj.toString())
-                "session.next.text.delta" -> json.decodeFromToString<Event.TextDelta>(obj.toString())
-                "session.next.text.ended" -> json.decodeFromToString<Event.TextEnded>(obj.toString())
+                "session.next.text.started" -> json.decodeFromString<Event.TextStarted>(obj.toString())
+                "session.next.text.delta" -> json.decodeFromString<Event.TextDelta>(obj.toString())
+                "session.next.text.ended" -> json.decodeFromString<Event.TextEnded>(obj.toString())
 
-                // Reasoning streaming
-                "session.next.reasoning.started" -> json.decodeFromToString<Event.ReasoningStarted>(obj.toString())
-                "session.next.reasoning.delta" -> json.decodeFromToString<Event.ReasoningDelta>(obj.toString())
-                "session.next.reasoning.ended" -> json.decodeFromToString<Event.ReasoningEnded>(obj.toString())
+                "session.next.reasoning.started" -> json.decodeFromString<Event.ReasoningStarted>(obj.toString())
+                "session.next.reasoning.delta" -> json.decodeFromString<Event.ReasoningDelta>(obj.toString())
+                "session.next.reasoning.ended" -> json.decodeFromString<Event.ReasoningEnded>(obj.toString())
 
-                // Tool events
-                "session.next.tool.input.started" -> json.decodeFromToString<Event.ToolInputStarted>(obj.toString())
-                "session.next.tool.input.delta" -> json.decodeFromToString<Event.ToolInputDelta>(obj.toString())
-                "session.next.tool.input.ended" -> json.decodeFromToString<Event.ToolInputEnded>(obj.toString())
-                "session.next.tool.called" -> json.decodeFromToString<Event.ToolCalled>(obj.toString())
-                "session.next.tool.progress" -> json.decodeFromToString<Event.ToolProgress>(obj.toString())
-                "session.next.tool.success" -> json.decodeFromToString<Event.ToolSuccess>(obj.toString())
-                "session.next.tool.failed" -> json.decodeFromToString<Event.ToolFailed>(obj.toString())
+                "session.next.tool.input.started" -> json.decodeFromString<Event.ToolInputStarted>(obj.toString())
+                "session.next.tool.input.delta" -> json.decodeFromString<Event.ToolInputDelta>(obj.toString())
+                "session.next.tool.input.ended" -> json.decodeFromString<Event.ToolInputEnded>(obj.toString())
+                "session.next.tool.called" -> json.decodeFromString<Event.ToolCalled>(obj.toString())
+                "session.next.tool.progress" -> json.decodeFromString<Event.ToolProgress>(obj.toString())
+                "session.next.tool.success" -> json.decodeFromString<Event.ToolSuccess>(obj.toString())
+                "session.next.tool.failed" -> json.decodeFromString<Event.ToolFailed>(obj.toString())
 
-                // Step events
-                "session.next.step.started" -> json.decodeFromToString<Event.StepStarted>(obj.toString())
-                "session.next.step.ended" -> json.decodeFromToString<Event.StepEnded>(obj.toString())
-                "session.next.step.failed" -> json.decodeFromToString<Event.StepFailed>(obj.toString())
+                "session.next.step.started" -> json.decodeFromString<Event.StepStarted>(obj.toString())
+                "session.next.step.ended" -> json.decodeFromString<Event.StepEnded>(obj.toString())
+                "session.next.step.failed" -> json.decodeFromString<Event.StepFailed>(obj.toString())
 
-                // Agent/model switch
-                "session.next.agent.switched" -> json.decodeFromToString<Event.AgentSwitched>(obj.toString())
-                "session.next.model.switched" -> json.decodeFromToString<Event.ModelSwitched>(obj.toString())
+                "session.next.agent.switched" -> json.decodeFromString<Event.AgentSwitched>(obj.toString())
+                "session.next.model.switched" -> json.decodeFromString<Event.ModelSwitched>(obj.toString())
 
-                // Permission
-                "permission.asked" -> json.decodeFromToString<Event.PermissionAsked>(obj.toString())
-                "permission.replied" -> json.decodeFromToString<Event.PermissionReplied>(obj.toString())
+                "permission.asked" -> json.decodeFromString<Event.PermissionAsked>(obj.toString())
+                "permission.replied" -> json.decodeFromString<Event.PermissionReplied>(obj.toString())
 
-                // Question
-                "question.asked" -> json.decodeFromToString<Event.QuestionAsked>(obj.toString())
-                "question.replied" -> json.decodeFromToString<Event.QuestionReplied>(obj.toString())
+                "question.asked" -> json.decodeFromString<Event.QuestionAsked>(obj.toString())
+                "question.replied" -> json.decodeFromString<Event.QuestionReplied>(obj.toString())
 
-                // Shell
-                "session.next.shell.started" -> json.decodeFromToString<Event.ShellStarted>(obj.toString())
-                "session.next.shell.ended" -> json.decodeFromToString<Event.ShellEnded>(obj.toString())
+                "session.next.shell.started" -> json.decodeFromString<Event.ShellStarted>(obj.toString())
+                "session.next.shell.ended" -> json.decodeFromString<Event.ShellEnded>(obj.toString())
 
-                // Compaction
-                "session.next.compaction.started" -> json.decodeFromToString<Event.CompactionStarted>(obj.toString())
-                "session.next.compaction.ended" -> json.decodeFromToString<Event.CompactionEnded>(obj.toString())
+                "session.next.compaction.started" -> json.decodeFromString<Event.CompactionStarted>(obj.toString())
+                "session.next.compaction.ended" -> json.decodeFromString<Event.CompactionEnded>(obj.toString())
 
-                // Ignore non-critical events
                 else -> null
             }
         } catch (e: Exception) {
