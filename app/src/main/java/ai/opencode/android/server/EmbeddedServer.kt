@@ -9,14 +9,11 @@ import io.ktor.server.routing.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.request.*
-import io.ktor.server.sse.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import java.util.concurrent.Executors
 
 object EmbeddedServer {
     private var server: ApplicationEngine? = null
@@ -135,13 +132,6 @@ object EmbeddedServer {
                     }
 
                     call.respond(userMessage)
-                }
-
-                sse("/event") {
-                    call.respondSse(event = ServerSentEvent(data = "connected"))
-                    events.collect { event ->
-                        call.respondSse(event = ServerSentEvent(data = event))
-                    }
                 }
             }
         }
