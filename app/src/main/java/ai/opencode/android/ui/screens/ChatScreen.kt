@@ -86,7 +86,6 @@ fun ChatScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                containerColor = TuiColors.Background,
                 drawerContainerColor = TuiColors.Background,
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {

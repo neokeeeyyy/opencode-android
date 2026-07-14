@@ -2,7 +2,6 @@ package ai.opencode.android.data.api
 
 import ai.opencode.android.data.model.Event
 import ai.opencode.android.data.model.SseEnvelope
-import io.ktor.client.plugins.sse.SSESession
 import io.ktor.client.plugins.sse.sseSession
 import io.ktor.client.request.url
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +35,6 @@ class SseClient @Inject constructor(
     val rawEvents: SharedFlow<SseEnvelope> = _rawEvents.asSharedFlow()
 
     private var job: Job? = null
-    private var session: SSESession? = null
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -52,11 +50,10 @@ class SseClient @Inject constructor(
         job = scope.launch {
             while (isActive) {
                 try {
-                    client.getSseClient().sseSession {
-                        url("${client.serverUrl.value}/event")
-                    }.use { sseSession ->
-                        session = sseSession
-                        sseSession.incoming.collect { sseEvent ->
+                    client.getSseClient().sseSession(
+                        urlString = "${client.serverUrl.value}/event"
+                    ) {
+                        incoming.collect { sseEvent ->
                             sseEvent.data?.let { data ->
                                 parseAndEmit(data)
                             }
@@ -66,8 +63,6 @@ class SseClient @Inject constructor(
                     if (isActive) {
                         kotlinx.coroutines.delay(3000)
                     }
-                } finally {
-                    session = null
                 }
             }
         }
@@ -171,6 +166,5 @@ class SseClient @Inject constructor(
     fun stop() {
         job?.cancel()
         job = null
-        session = null
     }
 }
