@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">opencode</string>
+    <string name="connect">connect</string>
+    <string name="disconnect">disconnect</string>
+    <string name="settings">settings</string>
+    <string name="sessions">sessions</string>
+    <string name="new_session">new session</string>
+    <string name="send">send</string>
+    <string name="type_message">type a message...</string>
+    <string name="server_url">server url</string>
+    <string name="connected">connected</string>
+    <string name="connecting">connecting…</string>
+    <string name="disconnected">disconnected</string>
+    <string name="error_connection">connection error</string>
+    <string name="approve">approve</string>
+    <string name="deny">deny</string>
+    <string name="permission_request">permission request</string>
+    <string name="no_sessions">no sessions yet</string>
+    <string name="model">model</string>
+    <string name="provider">provider</string>
+</resources>
