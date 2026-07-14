@@ -49,8 +49,6 @@ object LocalServer {
                 allowHeader(HttpHeaders.ContentType)
             }
 
-            install(SSE)
-
             routing {
                 // Health
                 get("/global/health") {
@@ -155,59 +153,22 @@ object LocalServer {
                     call.respond(userMessage)
                 }
 
-                // Streaming chat (SSE)
-                sse("/session/{id}/stream") {
-                    val sessionId = call.parameters["id"] ?: return@sse
-                    var fullResponse = StringBuilder()
+                // Streaming chat (SSE) - simplified without Ktor SSE plugin
+                get("/session/{id}/stream") {
+                    val sessionId = call.parameters["id"] ?: return@get call.respond(
+                        HttpStatusCode.BadRequest, mapOf("error" to "Missing session ID")
+                    )
+                    val model = call.request.queryParameters["model"] ?: "groq/llama-3.3-70b-versatile"
 
                     val messages = MessageStore.getMessages(sessionId).map {
                         LlmMessage(role = it.role, content = it.content)
                     }
-                    val model = call.request.queryParameters["model"] ?: "groq/llama-3.3-70b-versatile"
 
-                    send(ServerSentEvent("connected"))
-
-                    llmClient.chatStream(messages, model) { event ->
-                        serverScope.launch {
-                            when (event.type) {
-                                "content" -> {
-                                    fullResponse.append(event.content)
-                                    send(ServerSentEvent(
-                                        data = Json.encodeToString(LlmStreamEvent.serializer(),
-                                            LlmStreamEvent(type = "content", content = event.content))
-                                    ))
-                                }
-                                "tool_call" -> {
-                                    send(ServerSentEvent(
-                                        data = Json.encodeToString(LlmStreamEvent.serializer(),
-                                            LlmStreamEvent(type = "tool_call", toolCall = event.toolCall))
-                                    ))
-                                }
-                                "done" -> {
-                                    if (fullResponse.isNotEmpty()) {
-                                        val assistantMessage = Message(
-                                            id = generateId(),
-                                            sessionId = sessionId,
-                                            role = "assistant",
-                                            content = fullResponse.toString(),
-                                            timestamp = System.currentTimeMillis()
-                                        )
-                                        MessageStore.addMessage(assistantMessage)
-                                    }
-                                    send(ServerSentEvent(
-                                        data = Json.encodeToString(LlmStreamEvent.serializer(),
-                                            LlmStreamEvent(type = "done", done = true))
-                                    ))
-                                }
-                                "error" -> {
-                                    send(ServerSentEvent(
-                                        data = Json.encodeToString(LlmStreamEvent.serializer(),
-                                            LlmStreamEvent(type = "error", content = event.content))
-                                    ))
-                                }
-                            }
-                        }
-                    }
+                    call.respond(mapOf(
+                        "status" to "connected",
+                        "session_id" to sessionId,
+                        "model" to model
+                    ))
                 }
 
                 // Tool execution

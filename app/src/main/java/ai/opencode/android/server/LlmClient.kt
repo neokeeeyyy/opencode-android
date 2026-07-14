@@ -5,6 +5,9 @@ import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -14,8 +17,6 @@ import okhttp3.sse.EventSources
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 @Serializable
 data class LlmMessage(
@@ -91,7 +92,7 @@ class LlmClient @Inject constructor(
         val temporary: Boolean = false
     )
 
-    fun getFreeModels(): List<Pair<String, ModelInfo>> {
+    fun getFreeModels(): Map<String, ModelInfo> {
         return FREE_MODELS.filter { it.value.free }
     }
 
