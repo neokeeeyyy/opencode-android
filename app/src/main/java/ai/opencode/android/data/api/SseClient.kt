@@ -2,7 +2,7 @@ package ai.opencode.android.data.api
 
 import ai.opencode.android.data.model.Event
 import ai.opencode.android.data.model.SseEnvelope
-import io.ktor.client.plugins.sse.sseSession
+import io.ktor.client.plugins.sse.serverSentEvents
 import io.ktor.client.request.url
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -50,7 +50,7 @@ class SseClient @Inject constructor(
         job = scope.launch {
             while (isActive) {
                 try {
-                    client.getSseClient().sseSession(
+                    client.getSseClient().serverSentEvents(
                         urlString = "${client.serverUrl.value}/event"
                     ) {
                         incoming.collect { sseEvent ->
